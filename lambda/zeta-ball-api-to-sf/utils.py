@@ -46,3 +46,17 @@ def drop_file_in_s3(data, bucket_name, file_key):
         Key=file_key
     )
     print(f'File dropped in S3 at s3://{bucket_name}/{file_key}')
+
+def get_team_player_stats(team_key, week_number, access_token):
+    url = TEAM_ROSTER_STATS_URL_TEMPLATE.format(team_key=team_key, week_number=week_number)
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Accept': 'application/json'
+    }
+    resp = requests.get(url, headers=headers)
+    if resp.status_code != 200:
+        print('Error fetching team player stats:', resp.status_code, resp.text)
+        raise Exception('Failed to fetch team player stats')
+    
+    resp_json = xmltodict.parse(resp.text)
+    return resp_json

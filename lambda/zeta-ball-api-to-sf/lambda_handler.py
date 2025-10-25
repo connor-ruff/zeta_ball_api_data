@@ -11,6 +11,8 @@ def lambda_handler(event, context):
         client_id=api_creds_obj['client_id'],
         client_secret=api_creds_obj['client_secret']
     )
+
+    # Pull Matchup Data
     matchup_data = get_matchups_for_week(
         week_number=week_number, 
         access_token=access_token
@@ -18,8 +20,23 @@ def lambda_handler(event, context):
     drop_file_in_s3(
         data=matchup_data,
         bucket_name='connors-misc-blob-for-blobs',
-        file_key=f'zeta_ball/week_{week_number}_matchups.json'
+        file_key=f'zeta_ball/week_{week_number}/matchups.json'
     )
+
+    # Pull team stat data
+    for team_key in TEAM_KEYS:
+
+        team_stats_data = get_team_player_stats(
+            team_key, 
+            week_number, 
+            access_token
+        )
+
+        drop_file_in_s3(
+            data=team_stats_data,
+            bucket_name='connors-misc-blob-for-blobs',
+            file_key=f'zeta_ball/week_{week_number}/team_stats/{team_key}_stats.json'
+        )
 
     return {
         'statusCode': 200,
