@@ -3,7 +3,7 @@ from utils import *
 
 def lambda_handler(event, context):
     
-    week_number = event['week_number']
+    weeks_completed = calculate_weeks_since_season_start()
 
     api_creds_obj = get_api_creds()
     access_token = get_access_token_from_refresh_token(
@@ -14,13 +14,13 @@ def lambda_handler(event, context):
 
     # Pull Matchup Data
     matchup_data = get_matchups_for_week(
-        week_number=week_number, 
+        week_number=weeks_completed, 
         access_token=access_token
     )
     drop_file_in_s3(
         data=matchup_data,
         bucket_name='connors-misc-blob-for-blobs',
-        file_key=f'zeta_ball/week_{week_number}/matchups.json'
+        file_key=f'zeta_ball/week_{weeks_completed}/matchups.json'
     )
 
     # Pull team stat data
@@ -28,14 +28,14 @@ def lambda_handler(event, context):
 
         team_stats_data = get_team_player_stats(
             team_key, 
-            week_number, 
+            weeks_completed, 
             access_token
         )
 
         drop_file_in_s3(
             data=team_stats_data,
             bucket_name='connors-misc-blob-for-blobs',
-            file_key=f'zeta_ball/week_{week_number}/team_stats/{team_key}_stats.json'
+            file_key=f'zeta_ball/week_{weeks_completed}/team_stats/{team_key}_stats.json'
         )
 
     return {

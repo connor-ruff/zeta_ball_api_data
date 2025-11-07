@@ -1,5 +1,6 @@
 # FANTASY LEAGUE
 LEAGUE_KEY = '466.l.6036'
+SEASON_START_WEEK = '2025-10-20'
 
 TEAM_KEYS = [
     '466.l.6036.t.1', # Tommy Dating Nikki

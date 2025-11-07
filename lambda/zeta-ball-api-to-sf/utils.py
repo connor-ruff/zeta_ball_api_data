@@ -2,6 +2,8 @@ import requests
 import xmltodict
 import boto3
 import json
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo  # built into Python 3.9+
 from constants import * 
 
 def get_api_creds():
@@ -60,3 +62,18 @@ def get_team_player_stats(team_key, week_number, access_token):
     
     resp_json = xmltodict.parse(resp.text)
     return resp_json
+
+def calculate_weeks_since_season_start():
+
+    season_start_date = datetime.strptime(SEASON_START_WEEK, '%Y-%m-%d').date()
+    eastern = ZoneInfo("America/New_York")
+    now_eastern = datetime.now(eastern).date()
+
+    delta_days = (now_eastern - season_start_date).days
+    current_week_number = (delta_days // 7) + 1
+
+    weeks_completed = current_week_number - 1
+
+    return weeks_completed
+
+    # get todays date on Eastern Time
