@@ -38,6 +38,14 @@ def lambda_handler(event, context):
             file_key=f'zeta_ball/week_{weeks_completed}/team_stats/{team_key}_stats.json'
         )
 
+        matchup_stats_data = get_team_matchup_stats(team_key, access_token)
+
+        drop_file_in_s3(
+            data=matchup_stats_data,
+            bucket_name='connors-misc-blob-for-blobs',
+            file_key=f'zeta_ball/week_{weeks_completed}/team_matchups/{team_key}_matchups.json'
+        )
+
     return {
         'statusCode': 200,
         'body': json.dumps("Matchup data fetched successfully."),

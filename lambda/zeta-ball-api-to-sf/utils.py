@@ -77,3 +77,20 @@ def calculate_weeks_since_season_start():
     return weeks_completed
 
     # get todays date on Eastern Time
+
+
+def get_team_matchup_stats(team_key, access_token):
+
+    url = TEAM_MATCHUP_URL_TEMPLATE.format(team_key=team_key)
+    
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Accept': 'application/json'
+    }
+    resp = requests.get(url, headers=headers)
+    if resp.status_code != 200:
+        print('Error fetching matchups:', resp.status_code, resp.text)
+        raise Exception('Failed to fetch matchups')
+
+    resp_json = xmltodict.parse(resp.text)
+    return resp_json

@@ -27,4 +27,4 @@ TEAM_KEYS = [
 ACCESS_TOKEN_URL = "https://api.login.yahoo.com/oauth2/get_token"
 MATCHUP_WEEK_URL_TEMPLATE = 'https://fantasysports.yahooapis.com/fantasy/v2/league/{league_key}/scoreboard;week={week_number}'
 TEAM_ROSTER_STATS_URL_TEMPLATE = 'https://fantasysports.yahooapis.com/fantasy/v2/team/{team_key}/roster/players/stats;type=week;week={week_number}'
-
+TEAM_MATCHUP_URL_TEMPLATE = 'https://fantasysports.yahooapis.com/fantasy/v2/team/{team_key}/matchups'
