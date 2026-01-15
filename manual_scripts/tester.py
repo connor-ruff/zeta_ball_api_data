@@ -88,7 +88,7 @@ def get_team_matchup_stats(team_key, week_number, access_token):
     return resp_json
 
 def get_game_info(access_token):
-    url = f'https://fantasysports.yahooapis.com/fantasy/v2/league/{LEAGUE_KEY}/players/stats/'
+    url = f'https://fantasysports.yahooapis.com/fantasy/v2/league/{LEAGUE_KEY}/players;start=25;count=25/stats;type=date;date=2025-12-25'
     headers = {
         'Authorization': f'Bearer {access_token}',
         'Accept': 'application/json'
