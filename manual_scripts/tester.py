@@ -103,6 +103,50 @@ def get_game_info(access_token):
 
 
 
+def yahoo_get(url, access_token):
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Accept': 'application/json'
+    }
+    resp = requests.get(url, headers=headers)
+    if resp.status_code != 200:
+        print('Error calling Yahoo:', url, resp.status_code, resp.text)
+        raise Exception('Yahoo request failed')
+    return xmltodict.parse(resp.text)
+
+def as_list(x):
+    return x if isinstance(x, list) else [x]
+
+def list_my_nba_leagues(access_token):
+    """All NBA leagues the logged-in user has been in, across seasons (shows game_key + league_key)."""
+    url = 'https://fantasysports.yahooapis.com/fantasy/v2/users;use_login=1/games;game_codes=nba/leagues'
+    data = yahoo_get(url, access_token)
+    games = as_list(data['fantasy_content']['users']['user']['games']['game'])
+    for g in games:
+        for lg in as_list(g['leagues']['league']):
+            print(f"season={g['season']} game_key={g['game_key']} league_key={lg['league_key']} name={lg['name']}")
+
+def get_league_teams(league_key, access_token):
+    url = f'https://fantasysports.yahooapis.com/fantasy/v2/league/{league_key}/teams'
+    data = yahoo_get(url, access_token)
+    teams = as_list(data['fantasy_content']['league']['teams']['team'])
+    out = {}
+    for t in teams:
+        mgrs = as_list(t['managers']['manager'])
+        out[t['team_key']] = (t['name'], mgrs[0].get('nickname'))
+    return out
+
+def check_league_and_team_keys(access_token, league_key=LEAGUE_KEY, expected_team_keys=TEAM_KEYS):
+    """Prints the league's current teams and diffs them against the TEAM_KEYS list in this file."""
+    print(f'--- Teams in {league_key} ---')
+    actual = get_league_teams(league_key, access_token)
+    for k, (name, mgr) in sorted(actual.items(), key=lambda kv: int(kv[0].split('.t.')[1])):
+        print(f'{k}  {name}  ({mgr})')
+    expected = set(expected_team_keys)
+    print('Missing from Yahoo:', sorted(expected - set(actual)) or 'none')
+    print('Not in TEAM_KEYS:  ', sorted(set(actual) - expected) or 'none')
+
+
 aws_creds = get_creds_from_aws()
 access_token=get_access_token_from_refresh_token(
     refresh_token=aws_creds['refresh_token'],
@@ -110,8 +154,7 @@ access_token=get_access_token_from_refresh_token(
     client_secret=aws_creds['client_secret']
 )
 
-player_info = get_game_info(access_token)
+print('done')
 
-with open('player_info.json', 'w') as f:
-    json.dump(player_info, f, indent=4)
-
+# list_my_nba_leagues(access_token)
+# check_league_and_team_keys(access_token)
