@@ -207,3 +207,6 @@ marimo/_lsp/
 __marimo__/
 
 lambda/**/*.zip
+
+# Exploratory API response dumps
+manual_scripts/walt_output/

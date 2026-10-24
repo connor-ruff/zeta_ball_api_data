@@ -63,3 +63,13 @@ def get_access_token_from_refresh_token(refresh_token, client_id=CLIENT_ID, clie
     return token_data["access_token"]
 
 
+
+def main():
+    #get_first_access_token_link()
+    #get_access_and_refresh_tokens(AUTH_CODE)
+
+    get_access_token_from_refresh_token(REFRESH_TOKEN)
+
+main()
+
+

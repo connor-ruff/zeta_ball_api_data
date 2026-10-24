@@ -154,7 +154,6 @@ access_token=get_access_token_from_refresh_token(
     client_secret=aws_creds['client_secret']
 )
 
-print('done')
 
-# list_my_nba_leagues(access_token)
+list_my_nba_leagues(access_token)
 # check_league_and_team_keys(access_token)
