@@ -6,7 +6,7 @@ This repo is the "home base" for the Zeta Ball API data project. The project spa
 
 | Repo | Role |
 |------|------|
-| `zeta_ball_api_data` (this repo) | API-side work: auth and testing scripts (`manual_scripts/`) and analysis SQL (`queries/`). |
+| `zeta_ball_api_data` (this repo) | API-side work: auth and testing scripts for both Yahoo and Walter APIs (`manual_scripts/`) and analysis SQL (`queries/`). |
 | `connors_snowflake_db` | Snowflake object tracker for account `EI90710`. `snowflake_admin/` holds account-level setup (databases, roles, storage integrations). `snowflake_objects/` mirrors the Snowflake object navigator (database > schema > tables/views/procedures). |
 | `aws_iac_mngr` | AWS infrastructure for Connor's personal account, managed with OpenTofu (not Terraform). The Lambda source code now lives here. |
 
@@ -20,29 +20,38 @@ This repo is the "home base" for the Zeta Ball API data project. The project spa
 - AWS profile `connor-ruff-dev-acct`, primary region `us-east-2`. Do not re-run `bootstrap/` in `aws_iac_mngr`.
 - Snowflake DDL and objects belong in `connors_snowflake_db`, not in this repo. Lambda and infra changes belong in `aws_iac_mngr`.
 
-## STATUS: PAUSED (as of 2026-10-19) — waiting on Yahoo Fantasy API approval
+## STATUS: ACTIVE on Walter's API (as of 2026-10-24) — Yahoo path on hold pending approval
 
-The 2026-27 season pull is blocked. Nothing is broken in our code; Yahoo is refusing the app.
+The weekly refresh now reads from Walter's League Data API (`https://www.zetaball.com/api/v1`, league id `zeta_ball`), not Yahoo. Plan: run on Walter's API until Yahoo approves the app, then possibly switch back.
 
-**What happened**
-- Last season's Yahoo refresh token was dead (`invalid_grant`). Re-authorizing worked (token exchange returns 200), but every Fantasy API call returns `403 This application is not authorized to perform this action` (even `game/nba`). A garbage token gets 401, so the token is valid; the *app* isn't authorized for the Fantasy API.
-- Same result with the old app and a brand-new app (Fantasy Sports → Read enabled). Cleaning up connected apps and changing the `scope` param made no difference.
-- Yahoo now appears to require an application/approval step: https://sports.yahoo.com/developer/application-confirmation/ (sign API Access and Use Agreement; submit name, email, Client ID). **Connor submitted this for the new app on 2026-10-19.** Not confirmed as the cause, but it fits the evidence.
+**Why Yahoo is on hold**
+- Re-authorizing works (token exchange 200), but every Yahoo Fantasy API call returns `403 This application is not authorized to perform this action` (even `game/nba`). The token is valid; the *app* isn't authorized. Same with old and brand-new apps.
+- Likely cause: Yahoo's application/approval step (https://sports.yahoo.com/developer/application-confirmation/). Connor submitted it for the new app on 2026-10-19. Not confirmed.
+- Yahoo secret `yahoo-fantasy--slop-api-keys` has new `app_id`/`client_id`/`client_secret`; `auth_code`, `refresh_token`, `zeta_ball_2026_2027_league_key` intentionally BLANK. Values aren't managed by OpenTofu (container only).
 
-**Current state**
-- Secret `yahoo-fantasy--slop-api-keys`: new `app_id`, `client_id`, `client_secret` set. `auth_code`, `refresh_token`, and `zeta_ball_2026_2027_league_key` are intentionally BLANK. `zeta_ball_league_id` is still last season's (6036); verify.
-- Secret values are not managed by OpenTofu (container only), so no IaC drift. `tofu plan` in `secrets_manager/` showed no changes.
-- Snowflake task `STG.REFRESH_WEEKLY_TASK` is SUSPENDED. Do not resume until the API works. (EventBridge schedule `zeta-ball-api-pull` is an unused relic; leave disabled.)
-- `manual_scripts/tester.py` now has `list_my_nba_leagues()`, `get_league_teams()`, `check_league_and_team_keys()` for finding the 2026-27 league key and diffing team keys. A local `manual_scripts/new_secret.json` (gitignored; contains credentials) may exist — delete when done.
+**Current pipeline (Walter)** — separate infra, all named `*_WALTER_*` / `walter`:
+- Snowflake (`connors_snowflake_db/snowflake_objects/zeta_ball/`):
+  - `STG.REFRESH_WEEKLY_TASK` (Mon 8 PM ET) calls `STG.REFRESH_WEEKLY_WALTER()`. The task file ends with `RESUME`; verify actual task state in Snowflake rather than assuming.
+  - `STG.REFRESH_WEEKLY_WALTER()` first calls `STG.REFRESH_TEAMS_WALTER()` (updates `DWH.TEAMS.YAHOO_TEAM_NAME`), then pulls the week's matchups, loads `STG.WEEKLY_MATCHUPS_WALTER_RAW` → `STG.WEEKLY_MATCHUP_CATEGORY_STATS_WALTER`, then rebuilds that week's rows in `DWH.WEEKLY_TEAM_TOTALS` and `DWH.MATCHUPS_CROSSJOIN`. Deletes-then-inserts per season+week, so reruns are safe and old seasons are not truncated.
+  - Season and week are derived from `DWH.LEAGUES` (`YEAR(MAX(WEEK_1_START_DATE))`, `DATEDIFF('WEEK', ...)`). Only the current week is pulled; errors if the week is < 1. No backfill parameter yet.
+  - External function `STG.ZETA_BALL_WALTER_REFRESH_LAMBDA_TRIGGER(refresh_type_id, input1..5)`: type 1 = matchups (season, week), type 2 = teams (season). Stage `STG.ZETA_BALL_WALTER_STAGE`.
+  - Walter's API does not provide FGM/FGA/FTM/FTA; only `FG_PCT`/`FT_PCT` are populated in `DWH.WEEKLY_TEAM_TOTALS`.
+- AWS (`aws_iac_mngr/controlled_resources/`): Lambda `lambda-zeta-ball-walter-api-to-sf` (source in `lambda/function_code/zeta-ball-walter-api-to-sf/`), API Gateway route `route_zeta_ball_walter.tf`, IAM `lambda_zeta_ball_walter.tf`, secret `zetaball-walter-api-key` (`bsbk_...` bearer key).
+- Local: `manual_scripts/walt_test.py` hits the Walter endpoints and dumps JSON to `manual_scripts/walt_output/`.
 
-**To resume once Yahoo approves**
-1. Re-run OAuth: build the auth URL from the secret's `client_id`/`redirect_uri` (scope `fspt-r`), visit it, exchange the `code=` value (expires in minutes). Confirm `game/nba` returns 200.
-2. Run `tester.py` to get the 2026-27 `league_key` (`{game_key}.l.{league_id}`) and verify team keys. Then write `refresh_token`, `auth_code`, and `zeta_ball_2026_2027_league_key` to the secret (confirm with Connor before writing).
-3. Update season-specific values:
-   - `aws_iac_mngr/.../zeta-ball-api-to-sf/constants.py`: `LEAGUE_KEY`, `SEASON_START_WEEK = '2026-10-19'`, `TEAM_KEYS`; rebuild zip (`build-lambda-zip.sh`) and `tofu apply` in `controlled_resources/lambda/`.
-   - `connors_snowflake_db/.../stg/procedure/refresh_weekly.sql`: `TO_DATE('2026-10-19')` and the hardcoded `team_key_list`; re-run `CREATE OR REPLACE PROCEDURE`.
-   - `connors_snowflake_db/.../dwh/table/teams.sql`: re-seed with new team keys.
-4. Truncate last season's rows in `DWH.WEEKLY_TEAM_TOTALS` and `DWH.MATCHUPS_CROSSJOIN` (Connor said he'd do this) — week numbers collide across seasons.
-5. Resume the task: `ALTER TASK STG.REFRESH_WEEKLY_TASK RESUME`.
+**Reorganized dimensions (DWH)**
+- `DWH.LEAGUES`: one row per season (`LEAGUE_START_YEAR`, `WEEK_1_START_DATE`, `YAHOO_NBA_SEASON_KEY`, `YAHOO_LEAGUE_KEY`). 2026 row: start 2026-10-19, season key 478, league 19581. **Adding a new season row here is what advances the pipeline.**
+- `DWH.LEAGUE_MEMBERS`: `LEAGUE_MEMBER_SID` → `MANAGER` (stable across seasons).
+- `DWH.TEAMS`: one row per member per season (`TEAM_SID`, `LEAGUE_START_YEAR`, `LEAGUE_MEMBER_SID`, `YAHOO_TEAM_ID`, `YAHOO_TEAM_NAME`). Walter's `team_id` is the Yahoo team id; the pipeline joins on season + `YAHOO_TEAM_ID`. 2026 team ids are the same as 2025.
+- `DWH.TEAMS_FULL` view joins the three and builds `YAHOO_TEAM_KEY`.
+- Fact tables key on `TEAM_SID` + `LEAGUE_START_YEAR`, so seasons coexist.
 
-**Season timing:** week 1 is Mon 2026-10-19 – Sun 10-25. First scheduled run Mon 2026-10-26 pulls week 1 (WEEK_NUMBER = 1). If approval arrives late, `REFRESH_WEEKLY` only pulls the week computed from today's date; backfilling missed weeks needs a procedure change (e.g. an optional week parameter).
+**If switching back to Yahoo once approved** (the old Yahoo objects still exist: `STG.REFRESH_WEEKLY`, Lambda `lambda-zeta-ball-api-to-sf`, `zeta-ball-refresh` external function; the Yahoo procedure may be stale against the reorganized dimensions, so review before use):
+1. Re-run OAuth: auth URL from the secret's `client_id`/`redirect_uri` (scope `fspt-r`), exchange the `code=` value (expires in minutes). Confirm `game/nba` returns 200.
+2. Run `manual_scripts/tester.py` (`list_my_nba_leagues()`, `get_league_teams()`, `check_league_and_team_keys()`) to verify league/team keys, then write `refresh_token`, `auth_code`, `zeta_ball_2026_2027_league_key` to the secret (confirm with Connor first).
+3. Update season-specific values in `zeta-ball-api-to-sf/constants.py` (`LEAGUE_KEY`, `SEASON_START_WEEK`, `TEAM_KEYS`; rebuild zip, `tofu apply` in `controlled_resources/lambda/`) and in `stg/procedure/refresh_weekly.sql` (hardcoded date and `team_key_list`).
+4. Point `STG.REFRESH_WEEKLY_TASK` at `STG.REFRESH_WEEKLY` instead of the Walter procedure.
+
+Notes: EventBridge schedule `zeta-ball-api-pull` is an unused relic; leave disabled. A local `manual_scripts/new_secret.json` (gitignored; credentials) may exist; delete when done.
+
+**Season timing:** week 1 is Mon 2026-10-19 – Sun 10-25. First scheduled run Mon 2026-10-26 pulls week 1.
