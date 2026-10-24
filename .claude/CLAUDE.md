@@ -39,6 +39,11 @@ The weekly refresh now reads from Walter's League Data API (`https://www.zetabal
 - AWS (`aws_iac_mngr/controlled_resources/`): Lambda `lambda-zeta-ball-walter-api-to-sf` (source in `lambda/function_code/zeta-ball-walter-api-to-sf/`), API Gateway route `route_zeta_ball_walter.tf`, IAM `lambda_zeta_ball_walter.tf`, secret `zetaball-walter-api-key` (`bsbk_...` bearer key).
 - Local: `manual_scripts/walt_test.py` hits the Walter endpoints and dumps JSON to `manual_scripts/walt_output/`.
 
+**Public SlopCS website** — http://zeta-ball-slopcs.s3-website.us-east-2.amazonaws.com
+- **The SlopCS algorithm is proprietary.** Publish only rank, team, and SlopCS score. Never show or publish how it's computed (no W-L-T records, category results, or explanatory text) on the page or in the public JSON.
+- S3 bucket `zeta-ball-slopcs` (public read, plain S3 website, no CloudFront). `index.html` lives in `aws_iac_mngr/controlled_resources/s3/site_content/zeta-ball-slopcs/` and deploys via `tofu apply` in `s3/`.
+- After its commit, `STG.REFRESH_WEEKLY_WALTER` calls `STG.PUBLISH_SLOPCS()`, which unloads `data/latest.json` and `data/season_{yr}/week_{n}.json` via `STG.SLOPCS_SITE_STAGE`, reading from the `DWH.SLOP_CS_RANKINGS_BY_WEEK` view.
+
 **Reorganized dimensions (DWH)**
 - `DWH.LEAGUES`: one row per season (`LEAGUE_START_YEAR`, `WEEK_1_START_DATE`, `YAHOO_NBA_SEASON_KEY`, `YAHOO_LEAGUE_KEY`). 2026 row: start 2026-10-19, season key 478, league 19581. **Adding a new season row here is what advances the pipeline.**
 - `DWH.LEAGUE_MEMBERS`: `LEAGUE_MEMBER_SID` → `MANAGER` (stable across seasons).
@@ -52,6 +57,6 @@ The weekly refresh now reads from Walter's League Data API (`https://www.zetabal
 3. Update season-specific values in `zeta-ball-api-to-sf/constants.py` (`LEAGUE_KEY`, `SEASON_START_WEEK`, `TEAM_KEYS`; rebuild zip, `tofu apply` in `controlled_resources/lambda/`) and in `stg/procedure/refresh_weekly.sql` (hardcoded date and `team_key_list`).
 4. Point `STG.REFRESH_WEEKLY_TASK` at `STG.REFRESH_WEEKLY` instead of the Walter procedure.
 
-Notes: EventBridge schedule `zeta-ball-api-pull` is an unused relic; leave disabled. A local `manual_scripts/new_secret.json` (gitignored; credentials) may exist; delete when done.
+Notes: EventBridge schedule `zeta-ball-api-pull` is an unused relic; leave disabled.
 
 **Season timing:** week 1 is Mon 2026-10-19 – Sun 10-25. First scheduled run Mon 2026-10-26 pulls week 1.
