@@ -67,12 +67,33 @@ def dump_history_and_activity(api_key):
     dump_endpoint(api_key, 'manager_me', f'/leagues/{LEAGUE_ID}/managers/me')
 
 
+def dump_transactions(api_key, season=2026, txn_type=None, since=None, limit=200):
+    """League-wide adds, drops and trades, newest first (no manager filter).
+    txn_type: 'add', 'drop', 'add/drop' or 'trade'. since: 'YYYY-MM-DD' (US Eastern). limit max 200."""
+    params = {'season': season, 'limit': limit}
+    if txn_type:
+        params['type'] = txn_type
+    if since:
+        params['since'] = since
+    name = f'transactions_{season}' + (f"_{txn_type.replace('/', '_')}" if txn_type else '')
+    dump_endpoint(api_key, name, f'/leagues/{LEAGUE_ID}/transactions', params)
+
+
+def dump_outlook(api_key, manager='me', window='14d'):
+    """Live current-week matchup: each category now and projected to week's end, games left per side.
+    manager: a manager id from /teams, or 'me'. window: '7d', '14d' or '30d' averages for the projection."""
+    dump_endpoint(api_key, f'outlook_{manager}_{window}', f'/leagues/{LEAGUE_ID}/outlook',
+                  {'manager': manager, 'window': window})
+
+
 def main():
     api_key = get_api_key()
     print('API key retrieved successfully')
-    dump_league_overview(api_key)
+    #dump_league_overview(api_key)
     #dump_matchups(api_key)
     #dump_history_and_activity(api_key)
+    #dump_transactions(api_key)
+    dump_outlook(api_key)
 
 
 if __name__ == '__main__':
