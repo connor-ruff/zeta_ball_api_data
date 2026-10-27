@@ -41,7 +41,7 @@ The weekly refresh now reads from Walter's League Data API (`https://www.zetabal
 
 **Public SlopCS website** — http://zeta-ball-slopcs.s3-website.us-east-2.amazonaws.com
 - **The SlopCS algorithm is proprietary.** Publish only rank, team, and SlopCS score. Never show or publish how it's computed (no W-L-T records, category results, or explanatory text) on the page or in the public JSON.
-- S3 bucket `zeta-ball-slopcs` (public read, plain S3 website, no CloudFront). `index.html` lives in `aws_iac_mngr/controlled_resources/s3/site_content/zeta-ball-slopcs/` and deploys via `tofu apply` in `s3/`.
+- S3 bucket `zeta-ball-slopcs` (public read, plain S3 website, no CloudFront). `index.html` lives in `aws_iac_mngr/controlled_resources/general/s3/site_content/zeta-ball-slopcs/` and deploys via `tofu apply` in `general/s3/`. Published scores are win% x 10000, 2 decimals (scaled in `STG.PUBLISH_SLOPCS`).
 - After its commit, `STG.REFRESH_WEEKLY_WALTER` calls `STG.PUBLISH_SLOPCS()`, which unloads `data/latest.json` and `data/season_{yr}/week_{n}.json` via `STG.SLOPCS_SITE_STAGE`, reading from the `DWH.SLOP_CS_RANKINGS_BY_WEEK` view.
 
 **Reorganized dimensions (DWH)**
