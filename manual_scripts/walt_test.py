@@ -86,14 +86,30 @@ def dump_outlook(api_key, manager='me', window='14d'):
                   {'manager': manager, 'window': window})
 
 
+def dump_rosters(api_key, manager=None, include_stats=True, window='14d'):
+    """Current rosters synced from Yahoo (every ~15 min; current season only).
+    manager: a manager id from /teams, 'me', or None for all 18 teams.
+    include_stats: adds each player's 'recent' averages (7d/14d/30d) and 'schedule'.
+    window: which averages the stat filters/sort read (7d, 14d, 30d)."""
+    params = {'window': window}
+    if manager:
+        params['manager'] = manager
+    if include_stats:
+        params['include_stats'] = 'true'
+    name = 'rosters_' + (manager.replace(':', '_') if manager else 'all') + ('_stats' if include_stats else '')
+    dump_endpoint(api_key, name, f'/leagues/{LEAGUE_ID}/rosters', params)
+
+
 def main():
     api_key = get_api_key()
     print('API key retrieved successfully')
+    dump_rosters(api_key)                  # all teams, with stats
+    #dump_rosters(api_key, manager='me')    # just my team
     #dump_league_overview(api_key)
     #dump_matchups(api_key)
     #dump_history_and_activity(api_key)
     #dump_transactions(api_key)
-    dump_outlook(api_key)
+    #dump_outlook(api_key)
 
 
 if __name__ == '__main__':

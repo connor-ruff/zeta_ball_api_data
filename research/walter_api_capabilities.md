@@ -2,11 +2,13 @@
 
 *Researched 2026-10-24. Sources: the full API guide (`GET https://www.zetaball.com/api/v1/docs`, a single Markdown page), the OpenAPI spec (`/api/v1/openapi.json`), and live read-only calls against `zeta_ball` with our key.*
 
+> **Updated 2026-11-20.** Re-checked against the live guide (`/api/v1/docs`) and OpenAPI spec. Changes since 10-24: new endpoints `/box-scores`, `/streams`, `/games-played`, `/projections` (football only) and `/scoring-check` (admin, football only); new `/players` fields (`fgm`, `ftm`, `advanced` with 9-cat z-scores); new params (`availability`, `offset`). The 30-day game-log gap is largely solved by `/box-scores`. Updated sections are marked *(updated 11-20)*; the original 10-24 text is otherwise unchanged.
+
 ## TL;DR
 
 - **Rosters and player stats are covered well.** Every team's roster is synced from Yahoo every 15 minutes. Every player has per-game averages over 7, 14 and 30 days, a 30-day game log, the upcoming schedule (games in the next N days, back-to-backs) and injury status. `fga`/`fta` are included, so FG% and FT% can be weighted by volume properly.
-- **There are no player projections.** The only projection-like data is `/outlook`, which estimates the rest of the current week for your own matchup from recent averages. Anything forward-looking we have to build ourselves.
-- **Player stats are only a rolling 30 days.** `/players` takes no `season` parameter, and the game log covers only the last 30 days. **To get season-long per-player data, we have to collect it ourselves, starting soon.** Week 1 games (from 10/20) start dropping out of the 30-day window around **11/19**.
+- **There are still no basketball player projections** *(updated 11-20)*. `/projections` exists but is **football points leagues only**. For basketball, `/outlook` estimates the rest of the current week from recent averages, and the new `/streams` scores free-agent pickups by expected category wins (current week only). Rest-of-season forward-looking values we still build ourselves. `/players` now carries `advanced.*.value` (per-category 9-cat z-scores, volume-weighted FG%/FT%), which covers step 1 of the analyzer.
+- **`/players` is still a rolling 30 days, but history is now available via `/box-scores`** *(updated 11-20)*. `GET /players/{player_key}/box-scores` returns every game of the current season (paged with `limit` up to 500, plus `offset`), with `season`, `week`, `from`/`to` filters. For past basketball seasons it holds only games the player spent on a league roster. So **the urgent "collect game logs before 11/19" step is no longer needed**; a backfill is one paged call per player. The `advanced` block also gives season-to-date figures (`season` span).
 - **Walter already grades trades and drafts after the fact.** `/trades` replays every trade in league history (117 for Zeta Ball) and scores each side by expected matchup wins gained or lost. That's a useful benchmark and validation set for our own analyzer, which would look *forward* instead.
 - **There's a lot of league history.** Category totals for every matchup go back to 2022, when the league switched to 9-cat; 2018â€“2021 were points leagues. There are also standings with luck and expected wins, manager career profiles with Elo, and draft grades.
 
@@ -34,6 +36,14 @@ All are `GET` and read-only. Paths are under `https://www.zetaball.com/api/v1`, 
 | `/draft?season=` | Auction draft (2025 and 2026 are auctions), every pick graded: cost, value (9-cat z), steal/bust | Fun; season-start values |
 | `/games?sport=basketball&date=` or `from=&to=` | Real NBA schedule and scores. `pro_team` codes match the rosters | Games remaining per player |
 | `/documents` | League constitution and rules docs (none posted for Zeta Ball) | none |
+| `/players/{player_key}/box-scores?season=&week=&from=&to=&limit=&offset=` *(new)* | Every game for any player with history, any season held, paged (limit 1-500, default 50). Includes retired players and those outside the pool. Basketball: all current-season games; past seasons only games while on a league roster. Returns a `seasons[]` list with each season's Yahoo `player_key` | **Season-long player history; replaces most of the self-collection plan** |
+| `/streams?window=` *(new)* | Basketball categories: swing categories, free agents who help each, FAs ranked by expected category wins added today and for the rest of the week (`gain`, `net`) with the drop to make; `best_available` by rest-of-season z value when the week is decided | Waiver and streaming; a ready-made "value of a free agent" model |
+| `/games-played?season=&from_week=&to_week=` *(new)* | Games each team got from starters, per week and day, ranked (basketball) | Volume context behind category totals |
+| `/projections?season=&week=&manager=` *(new)* | Projected score and win probability per matchup, **football points leagues only** | Not usable for Zeta Ball |
+| `/scoring-check?season=` *(new)* | Commissioner/admin: team-week points vs Yahoo, football points only | Not usable for Zeta Ball |
+| `/docs/{page}`, `/llms.txt` *(new)* | Per-endpoint docs pages and an LLM-readable index | Reference |
+
+*(updated 11-20)* Other changes: `/players` and `/rosters` now also return `fgm`/`ftm` (so FG%/FT% can be rebuilt from makes), and `/players`/`/free-agents` return an `advanced` block (USG%, TS%, eFG%, AST:TO, per-36, minutes trend, hot/cold, consistency, 9-cat z-scores and ranks). `/free-agents` has a new `availability` filter (`free_agent` vs `waivers`), ranks by Walter's own 9-cat value per game over 30 days (it was Yahoo's rank), and `rostered.percent` is the Yahoo/ESPN average. `/transactions` gained `player` and `season` filters and a `limit` up to 200. `/players` now defines its pool as everyone rostered, the top-100 free agents and anyone with box scores this season. `/players` still has no `offset`. `/rosters` takes the same stat filters as `/players`.
 
 There's also a hosted **MCP server** at `https://www.zetaball.com/api/mcp` that exposes the same endpoints as tools, plus ready-made prompts: `trade_check`, `waiver_wire_report`, `lineup_check`, `scouting_report` and `weekly_recap`. It could be connected to Claude Code (`claude mcp add --transport http league https://www.zetaball.com/api/mcp`) for quick questions without writing any code. Worth trying as a baseline before building anything.
 
@@ -108,7 +118,7 @@ This uses the same pattern as the SlopCS pipeline: Snowflake external function â
 
 ## Suggested next steps (in order)
 
-1. **Start collecting player game logs before about 11/19**, when week 1 drops out of the 30-day window. Even a crude nightly dump to S3 would preserve the data while the rest gets designed.
+1. ~~Start collecting player game logs before about 11/19.~~ *(updated 11-20)* No longer urgent: `/players/{key}/box-scores` returns the full current-season history on demand. Still worth snapshotting daily for a stable record, but nothing is being lost.
 2. Try Walter's MCP `trade_check` prompt in Claude Code for a zero-code baseline.
 3. Build the player value model (z-scores from the 14-day and 30-day windows) as a Snowflake view.
 4. Build the before/after expected-category-wins evaluation and check it against Walter's graded trades from 2025.
