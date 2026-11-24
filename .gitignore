@@ -210,3 +210,5 @@ lambda/**/*.zip
 
 # Exploratory API response dumps
 manual_scripts/walt_output/
+
+TMP/
