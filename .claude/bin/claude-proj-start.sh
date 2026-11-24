@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Resolve the hub directory from the script's real location (follows symlinks)
 SCRIPT="$(realpath "${BASH_SOURCE[0]}")"
-HUB="$(cd "$(dirname "$SCRIPT")/.." && pwd)"
+HUB="$(cd "$(dirname "$SCRIPT")/../.." && pwd)"
 
 # The repos this project spans
 REPOS=(
