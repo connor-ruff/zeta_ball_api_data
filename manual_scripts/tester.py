@@ -1,4 +1,3 @@
-from auth import get_access_token_from_refresh_token
 import requests
 import xmltodict
 import json

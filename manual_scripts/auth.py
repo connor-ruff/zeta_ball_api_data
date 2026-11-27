@@ -2,12 +2,13 @@ import requests
 import urllib.parse
 from urllib.parse import urlparse, parse_qs
 
-CLIENT_ID = '<CLIENT_ID>'
-CLIENT_SECRET = '<CLIENT_SECRET>'
+
+CLIENT_ID = ''
+CLIENT_SECRET = ''
 REDIRECT_URI = 'https://github.com/connor-ruff'
 SCOPE = "fspt-r"  # fantasy sports read access
-AUTH_CODE = '<AUTH_CODE>'
-REFRESH_TOKEN = '<REFRESH_TOKEN>'
+AUTH_CODE = ''
+REFRESH_TOKEN = ''
 
 
 
@@ -63,12 +64,24 @@ def get_access_token_from_refresh_token(refresh_token, client_id=CLIENT_ID, clie
     return token_data["access_token"]
 
 
+def run_simple_test(token):
+    url = 'https://fantasysports.yahooapis.com/fantasy/v2/users;use_login=1/games;game_codes=nba/leagues'
+    headers = {
+            'Authorization': f'Bearer {token}',
+            'Accept': 'application/json'
+        }
+    resp = requests.get(url, headers=headers)
+    print(resp.status_code)
+    print(resp.text)
 
 def main():
     #get_first_access_token_link()
+
     #get_access_and_refresh_tokens(AUTH_CODE)
 
-    get_access_token_from_refresh_token(REFRESH_TOKEN)
+    token = get_access_token_from_refresh_token(REFRESH_TOKEN)
+    run_simple_test(token)
+
 
 main()
 
